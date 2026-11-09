@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   ipa:
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +15,6 @@ jobs:
         run: xcodegen generate
       - name: Compilar
         run: |
-          set -o pipefail
           xcodebuild archive \
             -project Trocado.xcodeproj \
             -scheme Trocado \
@@ -26,7 +25,11 @@ jobs:
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" | tail -n 200
+            CODE_SIGN_IDENTITY="" 2>&1 | tee build.log | grep -E "error:|\*\* ARCHIVE|Resolve Package" || true
+          exit ${PIPESTATUS[0]}
+      - name: Mostrar erros
+        if: failure()
+        run: grep -E "error:" build.log | sort -u | head -80 || true
       - name: Empacotar IPA
         run: |
           mkdir -p Payload

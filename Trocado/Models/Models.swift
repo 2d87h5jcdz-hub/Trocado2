@@ -37,7 +37,7 @@ enum SpendCategory: String, Codable, CaseIterable, Identifiable {
         case .outros: return "Outros gastos"
         case .interno: return "Entre minhas contas"
         case .investimentos: return "Investimentos"
-        case .faturaDetalhada: return "Fatura já detalhada"
+        case .faturaDetalhada: return "Já detalhado (não contar)"
         }
     }
 
@@ -120,6 +120,14 @@ struct Lancamento: Codable, Identifiable, Hashable {
     var sortKey: String { "\(year)-\(month)-\(day) \(time)" }
     var shortDate: String { isCard ? "\(day)/\(month) · crédito" : "\(day)/\(month) \(time)" }
     var isCard: Bool { billingMonth != nil }
+    var isManual: Bool { id.hasPrefix("manual|") }
+
+    /// Parcelas lançadas juntas à mão compartilham o mesmo grupo.
+    var manualGroup: String? {
+        guard isManual else { return nil }
+        let parts = id.split(separator: "|")
+        return parts.count > 1 ? String(parts[1]) : nil
+    }
 
     var isBTGInvoicePayment: Bool {
         !isCard && type.folded.contains("pagamento de fatura") && description.folded.contains("btg")
@@ -198,6 +206,21 @@ enum Format {
     static func brl(_ cents: Int) -> String {
         let value = NSDecimalNumber(value: cents).dividing(by: NSDecimalNumber(value: 100))
         return money.string(from: value) ?? "R$ \(Double(cents) / 100)"
+    }
+
+    /// Aceita "1.234,56", "1234,56" e "1234.56".
+    static func cents(fromInput text: String) -> Int? {
+        var cleaned = text
+            .replacingOccurrences(of: "R$", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        if cleaned.contains(",") {
+            cleaned = cleaned.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+        } else if let dot = cleaned.range(of: ".", options: .backwards),
+                  cleaned.distance(from: dot.upperBound, to: cleaned.endIndex) > 2 {
+            cleaned = cleaned.replacingOccurrences(of: ".", with: "")
+        }
+        guard let value = Double(cleaned), value > 0, value < 100_000_000 else { return nil }
+        return Int((value * 100).rounded())
     }
 
     private static let monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]

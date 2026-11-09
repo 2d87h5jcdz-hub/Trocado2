@@ -165,6 +165,54 @@ final class AppStore: ObservableObject {
         save()
     }
 
+    // MARK: Lançamentos manuais
+
+    /// `cents` é o valor de cada parcela, sempre positivo; o sinal vem da categoria.
+    func addManualEntry(description: String, cents: Int, date: Date, category: SpendCategory, installments: Int) {
+        let name = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, cents > 0 else { return }
+
+        let total = max(installments, 1)
+        let group = UUID().uuidString
+        let signed = category.kind == .expense ? -cents : cents
+        let calendar = Calendar.current
+
+        for number in 1...total {
+            guard let when = calendar.date(byAdding: .month, value: number - 1, to: date) else { continue }
+            let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: when)
+            let rawDate = String(
+                format: "%02d/%02d/%04d %02d:%02d",
+                parts.day ?? 1, parts.month ?? 1, parts.year ?? 2000, parts.hour ?? 0, parts.minute ?? 0
+            )
+            let id = "manual|\(group)|\(number)"
+            lancamentos.append(Lancamento(
+                id: id,
+                rawDate: rawDate,
+                bankCategory: "",
+                type: "Lançamento manual",
+                description: total > 1 ? "\(name) (\(number)/\(total))" : name,
+                cents: signed
+            ))
+            classification.overrides[id] = category
+        }
+
+        lancamentos.sort { $0.sortKey > $1.sortKey }
+        recompute()
+        save()
+    }
+
+    func deleteManualEntry(_ item: Lancamento, includingInstallments: Bool) {
+        guard item.isManual else { return }
+        let removed = lancamentos.filter {
+            includingInstallments ? $0.manualGroup == item.manualGroup : $0.id == item.id
+        }
+        let ids = Set(removed.map(\.id))
+        lancamentos.removeAll { ids.contains($0.id) }
+        for id in ids { classification.overrides[id] = nil }
+        recompute()
+        save()
+    }
+
     // MARK: Ajustes do usuário
 
     func setCategory(_ category: SpendCategory, for item: Lancamento, applyToAll: Bool) {

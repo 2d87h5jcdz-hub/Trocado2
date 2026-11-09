@@ -19,6 +19,11 @@ Tudo fica no iPhone. A única conexão de rede é o download do modelo de IA, fe
 
 A ordem de classificação é: correção manual, regra aprendida, contas próprias, `rules.json`, categoria do banco (na fatura, o que o banco já informou sobre aquele estabelecimento na conta).
 
+## Lançamentos manuais
+
+O botão **+** em Lançamentos registra gastos e entradas que não vêm em nenhum arquivo, com parcelamento opcional.
+Quando o gasto manual já representa um valor pago por transferência (por exemplo, uma compra no cartão de outra pessoa), classifique a transferência como **Já detalhado (não contar)** para não somar duas vezes.
+
 ## Modelos
 
 | Modelo | Download | Observação |

@@ -1,0 +1,38 @@
+name: Gerar IPA
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  ipa:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+      - name: Gerar projeto
+        run: xcodegen generate
+      - name: Compilar
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Trocado.xcodeproj \
+            -scheme Trocado \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Trocado.xcarchive \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" | tail -n 200
+      - name: Empacotar IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Trocado.xcarchive/Products/Applications/Trocado.app Payload/
+          zip -qry Trocado.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trocado-ipa
+          path: Trocado.ipa

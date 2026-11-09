@@ -1,0 +1,10 @@
+*.xcodeproj
+Trocado/Info.plist
+build/
+Payload/
+*.ipa
+.DS_Store
+# Nunca versionar extratos reais
+*.xls
+*.xlsx
+*.csv

@@ -5,6 +5,19 @@ private struct PersistedState: Codable {
     var balances: [DailyBalance] = []
     var invoices: [CardInvoice] = []
     var classification = UserClassification()
+    var cash = CashState()
+
+    init() {}
+
+    // Campos ausentes ganham valor padrão, para atualizações do app não perderem os dados já salvos.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        lancamentos = try container.decodeIfPresent([Lancamento].self, forKey: .lancamentos) ?? []
+        balances = try container.decodeIfPresent([DailyBalance].self, forKey: .balances) ?? []
+        invoices = try container.decodeIfPresent([CardInvoice].self, forKey: .invoices) ?? []
+        classification = try container.decodeIfPresent(UserClassification.self, forKey: .classification) ?? UserClassification()
+        cash = try container.decodeIfPresent(CashState.self, forKey: .cash) ?? CashState()
+    }
 }
 
 @MainActor
@@ -20,6 +33,7 @@ final class AppStore: ObservableObject {
     @Published var isImporting = false
     @Published private(set) var invoices: [CardInvoice] = []
     @Published var pendingEncryptedFile: Data?
+    @Published private(set) var cash = CashState()
     @Published private(set) var lastPasswordWasWrong = false
 
     private let categorizer = Categorizer()
@@ -154,6 +168,12 @@ final class AppStore: ObservableObject {
         for balance in parsed.balances { byDay[balance.dayKey] = balance }
         balances = byDay.values.sorted { $0.dayKey < $1.dayKey }
 
+        if let cents = parsed.currentBalanceCents, let day = parsed.periodEnd,
+           cash.statementDay.map({ day >= $0 }) ?? true {
+            cash.statementBalanceCents = cents
+            cash.statementDay = day
+        }
+
         if let holder = parsed.holderName {
             classification.holderName = holder
             classification.ownNames.insert(holder.folded)
@@ -213,6 +233,59 @@ final class AppStore: ObservableObject {
         save()
     }
 
+    // MARK: Caixa
+
+    func forecast(until end: Day) -> CashForecast {
+        CashForecastEngine.build(CashInput(
+            lancamentos: lancamentos,
+            categories: categories,
+            invoices: invoices,
+            state: cash,
+            today: .today
+        ), until: end)
+    }
+
+    func setManualBalance(cents: Int) {
+        cash.manualBalanceCents = cents
+        cash.manualBalanceDay = .today
+        // O saldo digitado já reflete o que foi pago até agora.
+        for key in Array(cash.paid.keys) { cash.paid[key] = .distantPast }
+        save()
+    }
+
+    func addCashItem(name: String, cents: Int, isIncome: Bool, day: Day, repeatsMonthly: Bool) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, cents > 0 else { return }
+        cash.items.append(CashItem(
+            id: "manual|\(UUID().uuidString)",
+            name: trimmed,
+            cents: cents,
+            isIncome: isIncome,
+            day: day,
+            repeatsMonthly: repeatsMonthly
+        ))
+        save()
+    }
+
+    func markSettled(_ occurrence: CashOccurrence) {
+        cash.paid[occurrence.id] = .today
+        save()
+    }
+
+    func setAmount(_ cents: Int, for occurrence: CashOccurrence) {
+        cash.amountOverrides[occurrence.id] = cents
+        save()
+    }
+
+    func stopForecasting(_ occurrence: CashOccurrence) {
+        if occurrence.source == .manual {
+            cash.items.removeAll { $0.id == occurrence.ruleID }
+        } else {
+            cash.ignoredRules.insert(occurrence.ruleID)
+        }
+        save()
+    }
+
     // MARK: Ajustes do usuário
 
     func setCategory(_ category: SpendCategory, for item: Lancamento, applyToAll: Bool) {
@@ -245,6 +318,7 @@ final class AppStore: ObservableObject {
         lancamentos = []
         balances = []
         invoices = []
+        cash = CashState()
         classification = UserClassification()
         Keychain.deletePassword()
         try? FileManager.default.removeItem(at: fileURL)
@@ -320,11 +394,17 @@ final class AppStore: ObservableObject {
         lancamentos = state.lancamentos
         balances = state.balances
         invoices = state.invoices
+        cash = state.cash
         classification = state.classification
     }
 
     private func save() {
-        let state = PersistedState(lancamentos: lancamentos, balances: balances, invoices: invoices, classification: classification)
+        var state = PersistedState()
+        state.lancamentos = lancamentos
+        state.balances = balances
+        state.invoices = invoices
+        state.classification = classification
+        state.cash = cash
         guard let data = try? JSONEncoder().encode(state) else { return }
         try? data.write(to: fileURL, options: [.atomic, .completeFileProtection])
     }

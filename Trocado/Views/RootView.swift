@@ -16,6 +16,8 @@ struct RootView: View {
                 .tabItem { Label("Resumo", systemImage: "chart.bar") }
             EntriesView()
                 .tabItem { Label("Lançamentos", systemImage: "list.bullet") }
+            CashView()
+                .tabItem { Label("Caixa", systemImage: "banknote") }
             SuggestionsView()
                 .tabItem { Label("Sugestões", systemImage: "lightbulb") }
             SettingsView(showImporter: $showImporter)

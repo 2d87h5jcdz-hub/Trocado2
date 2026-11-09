@@ -19,6 +19,11 @@ Tudo fica no iPhone. A única conexão de rede é o download do modelo de IA, fe
 
 A ordem de classificação é: correção manual, regra aprendida, contas próprias, `rules.json`, categoria do banco (na fatura, o que o banco já informou sobre aquele estabelecimento na conta).
 
+## Caixa
+
+A aba **Caixa** parte do saldo do extrato mais recente (ou de um saldo digitado) e projeta salários, contas recorrentes, faturas e itens manuais até a data escolhida.
+Quando um novo extrato traz o pagamento ou o recebimento, o item previsto sai sozinho da lista.
+
 ## Lançamentos manuais
 
 O botão **+** em Lançamentos registra gastos e entradas que não vêm em nenhum arquivo, com parcelamento opcional.

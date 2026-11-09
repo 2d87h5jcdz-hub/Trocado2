@@ -4,6 +4,8 @@ struct ParsedStatement {
     var holderName: String?
     var lancamentos: [Lancamento] = []
     var balances: [DailyBalance] = []
+    var currentBalanceCents: Int?
+    var periodEnd: Day?
 }
 
 /// Interpreta o extrato de conta corrente do BTG exportado em .xls.
@@ -29,6 +31,17 @@ enum BTGStatementParser {
                    let position = cells.firstIndex(where: { text($0.value)?.folded == "cliente:" }),
                    position + 1 < cells.count {
                     result.holderName = text(cells[position + 1].value)
+                }
+                if result.currentBalanceCents == nil,
+                   let position = cells.firstIndex(where: { text($0.value)?.folded == "saldo atual:" }),
+                   position + 1 < cells.count {
+                    result.currentBalanceCents = amountInCents(cells[position + 1].value)
+                }
+                if result.periodEnd == nil,
+                   let position = cells.firstIndex(where: { text($0.value)?.folded == "periodo do extrato:" }),
+                   position + 1 < cells.count,
+                   let period = text(cells[position + 1].value) {
+                    result.periodEnd = Day(brazilian: String(period.suffix(10)))
                 }
                 if cells.contains(where: { text($0.value)?.folded == "data e hora" }) {
                     var map: [String: Int] = [:]
